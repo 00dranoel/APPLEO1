@@ -1,295 +1,259 @@
-<!DOCTYPE html>\
-<html lang="it">\
-<head>\
-    <meta charset="UTF-8">\
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">\
-    <title>SmartBill Cloud</title>\
-    \
-    <!-- PWA Meta Tags per farla sembrare un'App -->\
-    <meta name="apple-mobile-web-app-capable" content="yes">\
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">\
-    <meta name="theme-color" content="#2563eb">\
-    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/3135/3135706.png">\
-\
-    <!-- Tailwind CSS per lo stile -->\
-    <script src="https://cdn.tailwindcss.com"></script>\
-    \
-    <!-- React & Librerie Grafiche -->\
-    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>\
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>\
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>\
-    <script src="https://unpkg.com/recharts/umd/Recharts.js"></script>\
-    <script src="https://unpkg.com/lucide-react"></script>\
-\
-    <style>\
-        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap');\
-        body \{ font-family: 'Plus Jakarta Sans', sans-serif; -webkit-tap-highlight-color: transparent; \}\
-        .custom-scrollbar::-webkit-scrollbar \{ width: 5px; \}\
-        .custom-scrollbar::-webkit-scrollbar-track \{ background: transparent; \}\
-        .custom-scrollbar::-webkit-scrollbar-thumb \{ background: #E2E8F0; border-radius: 20px; \}\
-    </style>\
-</head>\
-<body class="bg-slate-50">\
-    <div id="root"></div>\
-\
-    <script type="text/babel">\
-        const \{ useState, useMemo, useEffect, useRef \} = React;\
-        const \{ BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, AreaChart, Area, CartesianGrid \} = Recharts;\
-        const \{ \
-            Zap, Flame, Droplet, Plus, Trash2, LayoutDashboard, \
-            HardDrive, Info, Edit3, Save, Database, AlertTriangle, Cloud, Download, Upload, CheckCircle, Copy, ExternalLink, HelpCircle, X, AlertCircle \
-        \} = lucide;\
-\
-        const ENERGY_TYPES = \{\
-            Luce: \{ icon: Zap, color: '#eab308', unit: 'kWh' \},\
-            Gas: \{ icon: Flame, color: '#f97316', unit: 'Smc' \},\
-            Acqua: \{ icon: Droplet, color: '#3b82f6', unit: 'm\'b3' \}\
-        \};\
-\
-        const MONTHS_NAMES = ['G', 'F', 'M', 'A', 'M', 'G', 'L', 'A', 'S', 'O', 'N', 'D'];\
-        const FULL_MONTHS = ['Gen', 'Feb', 'Mar', 'Apr', 'Mag', 'Giu', 'Lug', 'Ago', 'Set', 'Ott', 'Nov', 'Dic'];\
-        const DEFAULT_SHEET_URL = "https://script.google.com/macros/s/AKfycbwdX79XjM80nugi1kCuGeJ131CACVTpcCL3UBNB8A_7IOuDQ8oIkJ7iTVQCI2nETTRVnw/exec";\
-\
-        function App() \{\
-            const [bills, setBills] = useState(() => \{\
-                try \{\
-                    const saved = localStorage.getItem('smartbill_v1_stable');\
-                    return saved ? JSON.parse(saved) : [];\
-                \} catch (e) \{ return []; \}\
-            \});\
-\
-            const [activeTab, setActiveTab] = useState('Luce');\
-            const [editingId, setEditingId] = useState(null);\
-            const [showConfig, setShowConfig] = useState(false);\
-            const [newBill, setNewBill] = useState(\{\
-                type: 'Luce', quantity: '', cost: '', year: new Date().getFullYear(), months: [] \
-            \});\
-            \
-            const [sheetUrl, setSheetUrl] = useState(localStorage.getItem('smartbill_sheet_url') || DEFAULT_SHEET_URL);\
-            const [isSyncing, setIsSyncing] = useState(false);\
-            const fileInputRef = useRef(null);\
-\
-            useEffect(() => \{\
-                localStorage.setItem('smartbill_v1_stable', JSON.stringify(bills));\
-            \}, [bills]);\
-\
-            useEffect(() => \{\
-                localStorage.setItem('smartbill_sheet_url', sheetUrl);\
-            \}, [sheetUrl]);\
-\
-            const getDuplicateMonths = (type, year, selectedMonths) => \{\
-                const existingMonths = bills\
-                    .filter(b => b.type === type && b.year === parseInt(year) && b.id !== editingId)\
-                    .flatMap(b => b.months);\
-                return selectedMonths.filter(m => existingMonths.includes(m));\
-            \};\
-\
-            const duplicateMonths = useMemo(() => \
-                getDuplicateMonths(newBill.type, newBill.year, newBill.months),\
-            [newBill.type, newBill.year, newBill.months, bills, editingId]);\
-\
-            const syncWithGoogle = async (data) => \{\
-                if (!sheetUrl) return;\
-                setIsSyncing(true);\
-                try \{\
-                    await fetch(sheetUrl, \{\
-                        method: 'POST',\
-                        mode: 'no-cors',\
-                        headers: \{ 'Content-Type': 'application/json' \},\
-                        body: JSON.stringify(data)\
-                    \});\
-                \} catch (error) \{\
-                    console.error("Sync Error:", error);\
-                \} finally \{\
-                    setTimeout(() => setIsSyncing(false), 800);\
-                \}\
-            \};\
-\
-            const handleAddBill = async (e) => \{\
-                e.preventDefault();\
-                if (!newBill.quantity || newBill.months.length === 0 || duplicateMonths.length > 0) return;\
-\
-                const billData = \{\
-                    ...newBill,\
-                    id: editingId || Date.now(),\
-                    quantity: parseFloat(newBill.quantity),\
-                    cost: parseFloat(newBill.cost) || 0,\
-                    year: parseInt(newBill.year),\
-                    timestamp: new Date().toISOString()\
-                \};\
-\
-                const updatedBills = editingId \
-                    ? bills.map(b => b.id === editingId ? billData : b)\
-                    : [...bills, billData];\
-\
-                setBills(updatedBills);\
-                setNewBill(\{ ...newBill, quantity: '', cost: '', months: [] \});\
-                setEditingId(null);\
-\
-                if (sheetUrl) await syncWithGoogle(billData);\
-            \};\
-\
-            const deleteBill = (id) => \{\
-                if(confirm("Sei sicuro di voler eliminare questo record?")) \{\
-                    setBills(bills.filter(b => b.id !== id));\
-                \}\
-            \};\
-\
-            const processedData = useMemo(() => \{\
-                const filtered = bills.filter(b => b.type === activeTab);\
-                const monthlyMap = \{\};\
-                filtered.forEach(bill => \{\
-                    const perMonthQty = bill.quantity / bill.months.length;\
-                    bill.months.forEach(m => \{\
-                        const key = `$\{bill.year\}-$\{m\}`;\
-                        if (!monthlyMap[key]) monthlyMap[key] = \{ quantity: 0, year: bill.year, mIdx: m \};\
-                        monthlyMap[key].quantity += perMonthQty;\
-                    \});\
-                \});\
-                const timeSeries = Object.entries(monthlyMap)\
-                    .map(([k, v]) => (\{ \
-                        period: `$\{v.year\} $\{FULL_MONTHS[v.mIdx]\}`, \
-                        sortKey: k,\
-                        quantity: parseFloat(v.quantity.toFixed(2)) \
-                    \}))\
-                    .sort((a, b) => a.sortKey.localeCompare(b.sortKey));\
-                const seasonality = Array.from(\{ length: 12 \}, (_, i) => \{\
-                    const dataForMonth = timeSeries.filter(d => d.sortKey.split('-')[1] === i.toString());\
-                    const avg = dataForMonth.length > 0 ? dataForMonth.reduce((s, c) => s + c.quantity, 0) / dataForMonth.length : 0;\
-                    return \{ name: FULL_MONTHS[i], avg: parseFloat(avg.toFixed(2)) \};\
-                \});\
-                return \{ timeSeries, seasonality \};\
-            \}, [bills, activeTab]);\
-\
-            return (\
-                <div className="min-h-screen bg-slate-50 p-4 md:p-8 font-sans text-slate-900">\
-                    <div className="max-w-6xl mx-auto space-y-6">\
-                        \
-                        <header className="bg-white p-5 rounded-[2.5rem] shadow-sm border border-slate-200 flex flex-col md:flex-row justify-between items-center gap-4">\
-                            <div className="flex items-center gap-4">\
-                                <div className="bg-blue-600 p-3 rounded-2xl text-white shadow-lg shadow-blue-100">\
-                                    <LayoutDashboard size=\{24\} />\
-                                </div>\
-                                <div>\
-                                    <h1 className="text-xl font-black text-slate-800 tracking-tight">SmartBill Cloud</h1>\
-                                    <div className="flex items-center gap-2 mt-0.5">\
-                                        <span className=\{`w-2 h-2 rounded-full $\{sheetUrl ? 'bg-green-500' : 'bg-slate-300'\}`\}></span>\
-                                        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">\
-                                            \{sheetUrl ? 'Database Cloud Attivo' : 'Offline'\}\
-                                        </p>\
-                                    </div>\
-                                </div>\
-                            </div>\
-                            \
-                            <div className="flex gap-2">\
-                                <button onClick=\{() => setShowConfig(!showConfig)\} className="flex items-center gap-2 px-5 py-3 rounded-2xl text-[10px] font-black bg-blue-50 text-blue-600 border border-blue-100">\
-                                    \{showConfig ? <X size=\{14\} /> : <Database size=\{14\} />\} \
-                                    CONFIG\
-                                </button>\
-                            </div>\
-                        </header>\
-\
-                        \{showConfig && (\
-                            <div className="bg-white border-2 border-blue-100 p-6 rounded-[2.5rem] shadow-xl animate-in fade-in slide-in-from-top-4">\
-                                <h3 className="text-sm font-black text-slate-800 uppercase mb-4">Stato Connessione</h3>\
-                                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 break-all text-[10px] font-mono mb-4 text-slate-500">\
-                                    \{sheetUrl\}\
-                                </div>\
-                                <button onClick=\{() => setSheetUrl(DEFAULT_SHEET_URL)\} className="text-[9px] font-black text-blue-600 uppercase underline">Ripristina Default</button>\
-                            </div>\
-                        )\}\
-\
-                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">\
-                            <aside className="lg:col-span-4 space-y-6">\
-                                <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-200">\
-                                    <h2 className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 mb-6">Registra Consumo</h2>\
-                                    <form onSubmit=\{handleAddBill\} className="space-y-6">\
-                                        <div className="flex gap-2 p-1 bg-slate-50 rounded-2xl border border-slate-100">\
-                                            \{['Luce', 'Gas', 'Acqua'].map(t => (\
-                                                <button key=\{t\} type="button" onClick=\{() => setNewBill(\{...newBill, type: t\})\} className=\{`flex-1 py-3 rounded-xl text-[10px] font-black transition-all $\{newBill.type === t ? 'bg-white text-slate-900 shadow-sm border border-slate-200' : 'text-slate-400'\}`\}>\{t.toUpperCase()\}</button>\
-                                            ))\}\
-                                        </div>\
-\
-                                        <div className="space-y-2">\
-                                            <div className="flex justify-between items-center ml-1">\
-                                                <label className="text-[9px] font-black text-slate-400 uppercase">Mesi</label>\
-                                                \{duplicateMonths.length > 0 && <span className="text-[9px] font-black text-red-500 animate-pulse">GI\'c0 REGISTRATO</span>\}\
-                                            </div>\
-                                            <div className="grid grid-cols-6 gap-2">\
-                                                \{MONTHS_NAMES.map((m, i) => \{\
-                                                    const isDuplicate = duplicateMonths.includes(i);\
-                                                    return (\
-                                                        <button key=\{i\} type="button" onClick=\{() => setNewBill(prev => (\{ ...prev, months: prev.months.includes(i) ? prev.months.filter(x => x !== i) : [...prev.months, i].sort((a,b)=>a-b) \}))\} \
-                                                            className=\{`h-10 rounded-xl text-[10px] font-bold border transition-all $\{newBill.months.includes(i) ? (isDuplicate ? 'bg-red-50 border-red-500 text-red-500' : 'bg-slate-800 border-slate-800 text-white shadow-md') : 'bg-white border-slate-100 text-slate-400'\}`\}>\
-                                                            \{m\}\
-                                                        </button>\
-                                                    );\
-                                                \})\}\
-                                            </div>\
-                                        </div>\
-\
-                                        <div className="grid grid-cols-2 gap-4">\
-                                            <input type="number" className="w-full rounded-2xl bg-slate-50 p-4 text-sm font-bold" value=\{newBill.year\} onChange=\{e => setNewBill(\{...newBill, year: e.target.value\})\} />\
-                                            <input type="number" step="0.01" className="w-full rounded-2xl bg-slate-50 p-4 text-sm font-bold" placeholder="Costo \'80" value=\{newBill.cost\} onChange=\{e => setNewBill(\{...newBill, cost: e.target.value\})\} />\
-                                        </div>\
-\
-                                        <div className="text-center">\
-                                            <label className="text-[9px] font-black text-slate-400 uppercase block mb-3">Consumo (\{ENERGY_TYPES[newBill.type].unit\})</label>\
-                                            <input type="number" step="0.01" required className="w-full rounded-[2rem] bg-slate-900 p-6 text-4xl font-black text-center text-white outline-none" placeholder="0.00" value=\{newBill.quantity\} onChange=\{e => setNewBill(\{...newBill, quantity: e.target.value\})\} />\
-                                        </div>\
-\
-                                        <button type="submit" disabled=\{isSyncing || duplicateMonths.length > 0\} className=\{`w-full py-5 rounded-[2rem] font-black text-xs uppercase tracking-[0.2em] shadow-xl transition-all $\{isSyncing || duplicateMonths.length > 0 ? 'bg-slate-100 text-slate-400' : 'bg-blue-600 text-white hover:bg-blue-700'\}`\}>\
-                                            \{duplicateMonths.length > 0 ? 'DUPLICATO' : (isSyncing ? 'INVIO...' : 'SALVA NEL CLOUD')\}\
-                                        </button>\
-                                    </form>\
-                                </div>\
-                            </aside>\
-\
-                            <main className="lg:col-span-8 space-y-6">\
-                                <div className="bg-white p-8 rounded-[3rem] shadow-sm border border-slate-200">\
-                                    <div className="flex justify-between items-center mb-8">\
-                                        <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest">Media Stagionale</h3>\
-                                        <div className="flex bg-slate-50 p-1.5 rounded-2xl border border-slate-100">\
-                                            \{Object.keys(ENERGY_TYPES).map(t => (\
-                                                <button key=\{t\} onClick=\{() => setActiveTab(t)\} className=\{`px-4 py-2 rounded-xl text-[10px] font-black transition-all $\{activeTab === t ? 'bg-white text-slate-900 shadow-md' : 'text-slate-400'\}`\}>\{t.toUpperCase()\}</button>\
-                                            ))\}\
-                                        </div>\
-                                    </div>\
-                                    <div className="h-64">\
-                                        <ResponsiveContainer width="100%" height="100%">\
-                                            <BarChart data=\{processedData.seasonality\}>\
-                                                <CartesianGrid strokeDasharray="3 3" vertical=\{false\} stroke="#f1f5f9" />\
-                                                <XAxis dataKey="name" tick=\{\{fill: '#94A3B8', fontSize: 10, fontWeight: 800\}\} axisLine=\{false\} tickLine=\{false\} />\
-                                                <Tooltip contentStyle=\{\{borderRadius: '20px', border: 'none', boxShadow: '0 10px 25px rgba(0,0,0,0.05)'\}\} />\
-                                                <Bar dataKey="avg" radius=\{[8, 8, 8, 8]\} fill=\{ENERGY_TYPES[activeTab].color\} barSize=\{30\} />\
-                                            </BarChart>\
-                                        </ResponsiveContainer>\
-                                    </div>\
-                                </div>\
-\
-                                <div className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-slate-200">\
-                                    <h2 className="text-[10px] font-black uppercase tracking-[0.3em] mb-4 text-slate-400 flex items-center gap-2"><HardDrive size=\{16\} /> Storico Recente</h2>\
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[300px] overflow-y-auto custom-scrollbar pr-2">\
-                                        \{bills.slice().reverse().map(b => (\
-                                            <div key=\{b.id\} className="p-4 bg-slate-50 rounded-2xl border border-transparent hover:border-slate-200 transition-all group flex justify-between items-center">\
-                                                <div>\
-                                                    <p className="text-[10px] font-black text-slate-800">\{b.year\} \'97 <span style=\{\{ color: ENERGY_TYPES[b.type].color \}\}>\{b.type.toUpperCase()\}</span></p>\
-                                                    <p className="text-[11px] font-bold text-slate-400">\{b.quantity\} \{ENERGY_TYPES[b.type].unit\} / \{b.cost\}\'80</p>\
-                                                </div>\
-                                                <button onClick=\{() => deleteBill(b.id)\} className="text-slate-300 hover:text-red-500"><Trash2 size=\{14\} /></button>\
-                                            </div>\
-                                        ))\}\
-                                    </div>\
-                                </div>\
-                            </main>\
-                        </div>\
-                    </div>\
-                </div>\
-            );\
-        \}\
-\
-        const root = ReactDOM.createRoot(document.getElementById('root'));\
-        root.render(<App />);\
-    </script>\
-</body>\
-</html>}
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>SmartBill Cloud</title>
+    
+    <!-- Configurazione Web App (PWA) -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#2563eb">
+    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/3135/3135706.png">
+
+    <!-- Tailwind CSS per il design moderno -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Librerie React e Grafici via CDN -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://unpkg.com/recharts/umd/Recharts.js"></script>
+    <script src="https://unpkg.com/lucide-react"></script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap');
+        body { 
+            font-family: 'Plus Jakarta Sans', sans-serif; 
+            -webkit-tap-highlight-color: transparent; 
+            user-select: none;
+        }
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
+        
+        /* Animazione caricamento */
+        .sync-pulse { animation: pulse 1s infinite; }
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+    </style>
+</head>
+<body class="bg-slate-50">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useMemo, useEffect, useRef } = React;
+        const { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, AreaChart, Area, CartesianGrid } = Recharts;
+        const { 
+            Zap, Flame, Droplet, Plus, Trash2, LayoutDashboard, 
+            HardDrive, Info, Database, Cloud, CheckCircle, X, AlertCircle 
+        } = lucide;
+
+        // Configurazione fissa per il tuo database
+        const DEFAULT_SHEET_URL = "https://script.google.com/macros/s/AKfycbwdX79XjM80nugi1kCuGeJ131CACVTpcCL3UBNB8A_7IOuDQ8oIkJ7iTVQCI2nETTRVnw/exec";
+
+        const ENERGY_TYPES = {
+            Luce: { icon: Zap, color: '#eab308', unit: 'kWh' },
+            Gas: { icon: Flame, color: '#f97316', unit: 'Smc' },
+            Acqua: { icon: Droplet, color: '#3b82f6', unit: 'm³' }
+        };
+
+        const MONTHS_NAMES = ['G', 'F', 'M', 'A', 'M', 'G', 'L', 'A', 'S', 'O', 'N', 'D'];
+        const FULL_MONTHS = ['Gen', 'Feb', 'Mar', 'Apr', 'Mag', 'Giu', 'Lug', 'Ago', 'Set', 'Ott', 'Nov', 'Dic'];
+
+        function App() {
+            const [bills, setBills] = useState(() => {
+                const saved = localStorage.getItem('smartbill_cloud_v1');
+                return saved ? JSON.parse(saved) : [];
+            });
+
+            const [activeTab, setActiveTab] = useState('Luce');
+            const [showConfig, setShowConfig] = useState(false);
+            const [isSyncing, setIsSyncing] = useState(false);
+            const [newBill, setNewBill] = useState({
+                type: 'Luce', quantity: '', cost: '', year: new Date().getFullYear(), months: [] 
+            });
+
+            useEffect(() => {
+                localStorage.setItem('smartbill_cloud_v1', JSON.stringify(bills));
+            }, [bills]);
+
+            // Verifica mesi duplicati per evitare errori nel database
+            const duplicateMonths = useMemo(() => {
+                const existing = bills
+                    .filter(b => b.type === newBill.type && b.year === parseInt(newBill.year))
+                    .flatMap(b => b.months);
+                return newBill.months.filter(m => existing.includes(m));
+            }, [newBill, bills]);
+
+            const syncToGoogle = async (data) => {
+                setIsSyncing(true);
+                try {
+                    await fetch(DEFAULT_SHEET_URL, {
+                        method: 'POST',
+                        mode: 'no-cors',
+                        body: JSON.stringify(data)
+                    });
+                } catch (e) {
+                    console.error("Errore Sync:", e);
+                } finally {
+                    setTimeout(() => setIsSyncing(false), 1000);
+                }
+            };
+
+            const handleSubmit = async (e) => {
+                e.preventDefault();
+                if (!newBill.quantity || newBill.months.length === 0 || duplicateMonths.length > 0) return;
+
+                const billData = {
+                    ...newBill,
+                    id: Date.now(),
+                    quantity: parseFloat(newBill.quantity),
+                    cost: parseFloat(newBill.cost) || 0,
+                    year: parseInt(newBill.year),
+                    timestamp: new Date().toISOString()
+                };
+
+                setBills([...bills, billData]);
+                setNewBill({ ...newBill, quantity: '', cost: '', months: [] });
+                
+                await syncToGoogle(billData);
+            };
+
+            const deleteRecord = (id) => {
+                if(window.confirm("Eliminare definitivamente questo record locale?")) {
+                    setBills(bills.filter(b => b.id !== id));
+                }
+            };
+
+            const chartData = useMemo(() => {
+                const filtered = bills.filter(b => b.type === activeTab);
+                const season = Array(12).fill(0).map((_, i) => ({ name: FULL_MONTHS[i], avg: 0, count: 0 }));
+                
+                filtered.forEach(b => {
+                    const val = b.quantity / b.months.length;
+                    b.months.forEach(m => {
+                        season[m].avg += val;
+                        season[m].count += 1;
+                    });
+                });
+
+                return season.map(s => ({ ...s, avg: s.count ? parseFloat((s.avg / s.count).toFixed(2)) : 0 }));
+            }, [bills, activeTab]);
+
+            return (
+                <div className="max-w-md mx-auto min-h-screen pb-20">
+                    {/* Header */}
+                    <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-lg border-b border-slate-100 p-4 flex justify-between items-center">
+                        <div className="flex items-center gap-3">
+                            <div className="bg-blue-600 p-2 rounded-xl text-white shadow-lg shadow-blue-200">
+                                <LayoutDashboard size={20} />
+                            </div>
+                            <h1 className="font-black text-slate-800 tracking-tight">SmartBill</h1>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            {isSyncing && <Cloud size={18} className="text-blue-500 sync-pulse" />}
+                            <button onClick={() => setShowConfig(!showConfig)} className="p-2 text-slate-400">
+                                <Database size={20} />
+                            </button>
+                        </div>
+                    </header>
+
+                    {showConfig && (
+                        <div className="m-4 p-4 bg-blue-600 rounded-3xl text-white shadow-xl animate-in fade-in slide-in-from-top-2">
+                            <p className="text-[10px] font-black uppercase opacity-60 mb-1">Database Connesso</p>
+                            <p className="text-[9px] font-mono break-all opacity-90">{DEFAULT_SHEET_URL}</p>
+                        </div>
+                    )}
+
+                    {/* Form di Inserimento */}
+                    <section className="m-4 bg-white p-6 rounded-[2.5rem] shadow-sm border border-slate-200">
+                        <form onSubmit={handleSubmit} className="space-y-6">
+                            <div className="flex gap-1 p-1 bg-slate-100 rounded-2xl">
+                                {Object.keys(ENERGY_TYPES).map(t => (
+                                    <button key={t} type="button" onClick={() => setNewBill({...newBill, type: t})} 
+                                        className={`flex-1 py-2 rounded-xl text-[10px] font-bold transition-all ${newBill.type === t ? 'bg-white shadow-sm text-slate-900' : 'text-slate-400'}`}>
+                                        {t.toUpperCase()}
+                                    </button>
+                                ))}
+                            </div>
+
+                            <div className="grid grid-cols-6 gap-2">
+                                {MONTHS_NAMES.map((m, i) => (
+                                    <button key={i} type="button" onClick={() => setNewBill(prev => ({ ...prev, months: prev.months.includes(i) ? prev.months.filter(x => x !== i) : [...prev.months, i].sort((a,b)=>a-b) }))}
+                                        className={`h-10 rounded-xl text-[10px] font-bold border transition-all ${newBill.months.includes(i) ? (duplicateMonths.includes(i) ? 'bg-red-500 border-red-500 text-white' : 'bg-slate-800 border-slate-800 text-white') : 'bg-white border-slate-100 text-slate-400'}`}>
+                                        {m}
+                                    </button>
+                                ))}
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <input type="number" className="bg-slate-50 p-4 rounded-2xl text-sm font-bold outline-none" value={newBill.year} onChange={e => setNewBill({...newBill, year: e.target.value})} />
+                                <input type="number" step="0.01" className="bg-slate-50 p-4 rounded-2xl text-sm font-bold outline-none" placeholder="Costo €" value={newBill.cost} onChange={e => setNewBill({...newBill, cost: e.target.value})} />
+                            </div>
+
+                            <div className="text-center">
+                                <span className="text-[9px] font-black text-slate-300 uppercase tracking-widest block mb-2">Consumo {ENERGY_TYPES[newBill.type].unit}</span>
+                                <input type="number" step="0.01" required className="w-full text-4xl font-black text-center outline-none text-slate-800" placeholder="0.00" value={newBill.quantity} onChange={e => setNewBill({...newBill, quantity: e.target.value})} />
+                            </div>
+
+                            <button type="submit" disabled={isSyncing || duplicateMonths.length > 0} 
+                                className={`w-full py-5 rounded-[2rem] font-black text-xs uppercase tracking-widest shadow-lg transition-all ${duplicateMonths.length > 0 ? 'bg-red-100 text-red-400' : 'bg-blue-600 text-white active:scale-95 shadow-blue-100'}`}>
+                                {duplicateMonths.length > 0 ? 'Mese già esistente' : (isSyncing ? 'Sincronizzazione...' : 'Salva nel Cloud')}
+                            </button>
+                        </form>
+                    </section>
+
+                    {/* Grafico */}
+                    <section className="m-4 bg-white p-6 rounded-[2.5rem] shadow-sm border border-slate-200">
+                        <div className="flex justify-between items-center mb-6">
+                            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Andamento Medio</h3>
+                            <div className="flex gap-2">
+                                {Object.keys(ENERGY_TYPES).map(t => (
+                                    <button key={t} onClick={() => setActiveTab(t)} className={`w-2 h-2 rounded-full ${activeTab === t ? 'scale-150' : 'opacity-20'}`} style={{backgroundColor: ENERGY_TYPES[t].color}}></button>
+                                ))}
+                            </div>
+                        </div>
+                        <div className="h-48">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={chartData}>
+                                    <XAxis dataKey="name" tick={{fontSize: 9, fontWeight: 800, fill: '#cbd5e1'}} axisLine={false} tickLine={false} />
+                                    <Tooltip cursor={{fill: '#f8fafc'}} contentStyle={{borderRadius: '15px', border: 'none', boxShadow: '0 10px 20px rgba(0,0,0,0.05)'}} />
+                                    <Bar dataKey="avg" fill={ENERGY_TYPES[activeTab].color} radius={[4, 4, 4, 4]} />
+                                </BarChart>
+                            </ResponsiveContainer>
+                        </div>
+                    </section>
+
+                    {/* Lista Storico Locale */}
+                    <section className="m-4 space-y-3">
+                        <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Storico Locale</h3>
+                        {bills.slice().reverse().map(b => (
+                            <div key={b.id} className="bg-white p-4 rounded-[1.5rem] border border-slate-100 flex justify-between items-center shadow-sm">
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2 rounded-xl" style={{backgroundColor: ENERGY_TYPES[b.type].color + '20', color: ENERGY_TYPES[b.type].color}}>
+                                        {React.createElement(ENERGY_TYPES[b.type].icon, {size: 16})}
+                                    </div>
+                                    <div>
+                                        <p className="text-[11px] font-black text-slate-800">{b.year} — {b.months.map(m => FULL_MONTHS[m]).join(', ')}</p>
+                                        <p className="text-[10px] font-bold text-slate-400">{b.quantity} {ENERGY_TYPES[b.type].unit} • {b.cost}€</p>
+                                    </div>
+                                </div>
+                                <button onClick={() => deleteRecord(b.id)} className="p-2 text-slate-200 hover:text-red-400 transition-colors">
+                                    <Trash2 size={16} />
+                                </button>
+                            </div>
+                        ))}
+                    </section>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
