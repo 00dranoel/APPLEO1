@@ -1,186 +1,32 @@
 <!DOCTYPE html>
-<html lang="it">
+<html>
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SmartBill Cloud</title>
-    
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="theme-color" content="#2563eb">
-    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/3135/3135706.png">
-
+    <title>Test SmartBill</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <script src="https://unpkg.com/recharts/umd/Recharts.js"></script>
-    <script src="https://unpkg.com/lucide-react"></script>
-
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap');
-        body { 
-            font-family: 'Plus Jakarta Sans', sans-serif; 
-            -webkit-tap-highlight-color: transparent; 
-        }
-    </style>
 </head>
-<body class="bg-slate-50">
+<body class="bg-blue-500 flex items-center justify-center min-h-screen">
     <div id="root"></div>
-
     <script type="text/babel">
-        const { useState, useMemo, useEffect } = React;
-        const { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer } = Recharts;
-        const { Zap, Flame, Droplet, LayoutDashboard, Cloud, Trash2 } = lucide;
-
-        // URL del tuo Google Script
-        const DEFAULT_SHEET_URL = "https://script.google.com/macros/s/AKfycbwdX79XjM80nugi1kCuGeJ131CACVTpcCL3UBNB8A_7IOuDQ8oIkJ7iTVQCI2nETTRVnw/exec";
-
-        const ENERGY_TYPES = {
-            Luce: { icon: Zap, color: '#eab308', unit: 'kWh' },
-            Gas: { icon: Flame, color: '#f97316', unit: 'Smc' },
-            Acqua: { icon: Droplet, color: '#3b82f6', unit: 'm³' }
-        };
-
-        const MONTHS = ['G','F','M','A','M','G','L','A','S','O','N','D'];
-        const FULL_MONTHS = ['Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott','Nov','Dic'];
-
         function App() {
-            const [bills, setBills] = useState(() => {
-                const saved = localStorage.getItem('smartbill_vfinal');
-                return saved ? JSON.parse(saved) : [];
-            });
-            const [activeTab, setActiveTab] = useState('Luce');
-            const [isSyncing, setIsSyncing] = useState(false);
-            const [newBill, setNewBill] = useState({ 
-                type: 'Luce', quantity: '', cost: '', year: new Date().getFullYear(), months: [] 
-            });
-
-            useEffect(() => { 
-                localStorage.setItem('smartbill_vfinal', JSON.stringify(bills)); 
-            }, [bills]);
-
-            const handleSubmit = async (e) => {
-                e.preventDefault();
-                if (!newBill.quantity || newBill.months.length === 0) return;
-
-                const billData = { 
-                    ...newBill, 
-                    id: Date.now(), 
-                    quantity: parseFloat(newBill.quantity), 
-                    cost: parseFloat(newBill.cost) || 0 
-                };
-
-                setBills([...bills, billData]);
-                setNewBill({ ...newBill, quantity: '', cost: '', months: [] });
-                setIsSyncing(true);
-
-                try { 
-                    await fetch(DEFAULT_SHEET_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify(billData) }); 
-                } catch (err) { console.error("Sync error"); }
-                
-                setTimeout(() => setIsSyncing(false), 1000);
-            };
-
-            const chartData = useMemo(() => {
-                return FULL_MONTHS.map((m, i) => {
-                    const filtered = bills.filter(b => b.type === activeTab && b.months.includes(i));
-                    const sum = filtered.reduce((acc, curr) => acc + (curr.quantity / curr.months.length), 0);
-                    return { name: m, val: parseFloat(sum.toFixed(1)) };
-                });
-            }, [bills, activeTab]);
-
             return (
-                <div className="max-w-md mx-auto min-h-screen pb-10">
-                    <header className="p-6 flex justify-between items-center bg-white border-b sticky top-0 z-50">
-                        <div className="flex items-center gap-2">
-                            <div className="bg-blue-600 p-2 rounded-lg text-white"><LayoutDashboard size={18} /></div>
-                            <h1 className="font-extrabold text-slate-800">SmartBill</h1>
-                        </div>
-                        {isSyncing && <Cloud size={20} className="text-blue-500 animate-pulse" />}
-                    </header>
-
-                    <main className="p-4 space-y-6">
-                        {/* Selettore Tipo */}
-                        <div className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-slate-200">
-                            <form onSubmit={handleSubmit} className="space-y-4">
-                                <div className="flex gap-1 p-1 bg-slate-100 rounded-xl">
-                                    {Object.keys(ENERGY_TYPES).map(t => (
-                                        <button key={t} type="button" onClick={() => setNewBill({...newBill, type: t})} 
-                                            className={`flex-1 py-2 rounded-lg text-[10px] font-bold ${newBill.type === t ? 'bg-white shadow text-slate-900' : 'text-slate-400'}`}>
-                                            {t.toUpperCase()}
-                                        </button>
-                                    ))}
-                                </div>
-
-                                <div className="grid grid-cols-6 gap-1">
-                                    {MONTHS.map((m, i) => (
-                                        <button key={i} type="button" 
-                                            onClick={() => setNewBill(p => ({ ...p, months: p.months.includes(i) ? p.months.filter(x => x !== i) : [...p.months, i] }))} 
-                                            className={`h-8 rounded-lg text-[10px] font-bold border ${newBill.months.includes(i) ? 'bg-slate-800 text-white' : 'bg-white text-slate-400'}`}>
-                                            {m}
-                                        </button>
-                                    ))}
-                                </div>
-
-                                <div className="grid grid-cols-2 gap-2">
-                                    <input type="number" className="bg-slate-50 p-3 rounded-xl text-sm font-bold outline-none" value={newBill.year} onChange={e => setNewBill({...newBill, year: e.target.value})} />
-                                    <input type="number" step="0.01" className="bg-slate-50 p-3 rounded-xl text-sm font-bold outline-none" placeholder="Costo €" value={newBill.cost} onChange={e => setNewBill({...newBill, cost: e.target.value})} />
-                                </div>
-
-                                <input type="number" step="0.01" required className="w-full text-4xl font-black text-center p-4 outline-none" placeholder="0.00" value={newBill.quantity} onChange={e => setNewBill({...newBill, quantity: e.target.value})} />
-                                
-                                <button type="submit" className="w-full py-4 rounded-2xl bg-blue-600 text-white font-black text-xs uppercase tracking-widest shadow-lg shadow-blue-100 active:scale-95 transition-all">
-                                    Salva nel Cloud
-                                </button>
-                            </form>
-                        </div>
-
-                        {/* Grafico */}
-                        <div className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-slate-200">
-                            <div className="flex justify-between items-center mb-4">
-                                <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Media {activeTab}</h3>
-                                <div className="flex gap-2">
-                                    {Object.keys(ENERGY_TYPES).map(t => (
-                                        <button key={t} onClick={() => setActiveTab(t)} className={`w-3 h-3 rounded-full ${activeTab === t ? 'ring-4 ring-slate-100' : 'opacity-20'}`} style={{backgroundColor: ENERGY_TYPES[t].color}}></button>
-                                    ))}
-                                </div>
-                            </div>
-                            <div className="h-40">
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <BarChart data={chartData}>
-                                        <XAxis dataKey="name" tick={{fontSize: 8, fontWeight: 800}} axisLine={false} tickLine={false} />
-                                        <Bar dataKey="val" fill={ENERGY_TYPES[activeTab].color} radius={[4, 4, 0, 0]} />
-                                    </BarChart>
-                                </ResponsiveContainer>
-                            </div>
-                        </div>
-
-                        {/* Lista Storico Rapido */}
-                        <div className="space-y-2">
-                            {bills.slice(-3).reverse().map(b => (
-                                <div key={b.id} className="bg-white p-4 rounded-2xl border border-slate-100 flex justify-between items-center">
-                                    <div className="flex items-center gap-3">
-                                        <div className="p-2 rounded-lg" style={{backgroundColor: ENERGY_TYPES[b.type].color + '20', color: ENERGY_TYPES[b.type].color}}>
-                                            {b.type === 'Luce' ? <Zap size={14}/> : b.type === 'Gas' ? <Flame size={14}/> : <Droplet size={14}/>}
-                                        </div>
-                                        <div>
-                                            <p className="text-[10px] font-black">{b.year} - {b.months.map(m => MONTHS[m]).join(',')}</p>
-                                            <p className="text-[9px] font-bold text-slate-400">{b.quantity}{ENERGY_TYPES[b.type].unit} • {b.cost}€</p>
-                                        </div>
-                                    </div>
-                                    <button onClick={() => setBills(bills.filter(x => x.id !== b.id))} className="text-slate-200 hover:text-red-500 transition-colors"><Trash2 size={14}/></button>
-                                </div>
-                            ))}
-                        </div>
-                    </main>
+                <div className="bg-white p-10 rounded-3xl shadow-2xl text-center">
+                    <h1 className="text-3xl font-black text-blue-600">SMARTBILL ONLINE! 🚀</h1>
+                    <p className="text-slate-500 mt-2">Se vedi questo messaggio, la tua pagina funziona.</p>
+                    <button 
+                        onClick={() => alert('Funziona anche il tasto!')}
+                        className="mt-5 bg-blue-600 text-white px-6 py-2 rounded-full font-bold">
+                        PROVA TASTO
+                    </button>
                 </div>
             );
         }
-
         const root = ReactDOM.createRoot(document.getElementById('root'));
         root.render(<App />);
     </script>
 </body>
 </html>
+
