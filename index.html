@@ -1,55 +1,15 @@
 <!DOCTYPE html>
-<html lang="it">
+<html>
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>SmartBill Cloud</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <script src="https://unpkg.com/recharts/umd/Recharts.js"></script>
-    <script src="https://unpkg.com/lucide-react"></script>
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap');
-        body { font-family: 'Plus Jakarta Sans', sans-serif; -webkit-tap-highlight-color: transparent; }
-    </style>
 </head>
-<body class="bg-slate-50">
-    <div id="root"></div>
-    <script type="text/babel">
-        const { useState, useEffect } = React;
-        const { BarChart, Bar, XAxis, ResponsiveContainer } = Recharts;
-        const { Zap, Flame, Droplet, LayoutDashboard, Cloud } = lucide;
-
-        function App() {
-            const [bills, setBills] = useState([]);
-            const [activeTab, setActiveTab] = useState('Luce');
-
-            return (
-                <div className="max-w-md mx-auto min-h-screen">
-                    <header className="p-6 flex justify-between items-center bg-white border-b">
-                        <div className="flex items-center gap-2">
-                            <div className="bg-blue-600 p-2 rounded-lg text-white"><LayoutDashboard size={18} /></div>
-                            <h1 className="font-extrabold text-slate-800">SmartBill</h1>
-                        </div>
-                        <Cloud size={20} className="text-blue-500" />
-                    </header>
-                    <main className="p-4">
-                        <div className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-slate-200 text-center">
-                            <h2 className="text-xl font-bold mb-4 text-blue-600">App Caricata con Successo!</h2>
-                            <p className="text-slate-500 text-sm">Se vedi questo, GitHub Pages sta funzionando correttamente.</p>
-                            <div className="mt-6 p-4 bg-slate-100 rounded-2xl flex justify-around">
-                                <Zap className="text-yellow-500" />
-                                <Flame className="text-orange-500" />
-                                <Droplet className="text-blue-500" />
-                            </div>
-                        </div>
-                    </main>
-                </div>
-            );
-        }
-        ReactDOM.createRoot(document.getElementById('root')).render(<App />);
-    </script>
+<body class="bg-slate-900 text-white flex items-center justify-center min-h-screen">
+    <div class="text-center p-10 border-4 border-blue-500 rounded-3xl">
+        <h1 class="text-4xl font-black mb-4">SMARTBILL IS LIVE 🚀</h1>
+        <p class="text-slate-400">Se vedi questo fondo scuro, GitHub sta leggendo il file correttamente.</p>
+        <div class="mt-8 text-6xl">⚡ 🔥 💧</div>
+    </div>
 </body>
 </html>
