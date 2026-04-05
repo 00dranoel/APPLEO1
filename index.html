@@ -83,7 +83,7 @@
                     <div class="bg-slate-900 p-3 rounded-2xl border border-slate-700"><label class="text-[9px] font-bold text-slate-500 uppercase mb-1 block">Spesa €</label><input type="number" id="in-cost" placeholder="0.00" class="font-bold text-emerald-400"></div>
                 </div>
                 <div id="note-container" class="hidden"><input type="text" id="in-note" placeholder="Dettagli..." class="bg-slate-900 p-4 rounded-2xl border border-slate-700 text-sm w-full"></div>
-                <div class="text-center"><input type="number" id="in-qty" placeholder="0.00" class="text-6xl font-black text-center tracking-tighter"><p id="unit-txt" class="text-slate-500 font-bold text-[11px] uppercase mt-2">kWh</p></div>
+                <div class="text-center" id="qty-container"><input type="number" id="in-qty" placeholder="0.00" class="text-6xl font-black text-center tracking-tighter"><p id="unit-txt" class="text-slate-500 font-bold text-[11px] uppercase mt-2">kWh</p></div>
                 <button onclick="saveData()" id="btn-save" class="w-full py-5 bg-blue-600 text-white rounded-2xl font-black uppercase active:scale-95 transition-all">Salva</button>
             </div>
             <div id="history-list" class="space-y-3 pb-20"></div>
@@ -97,18 +97,11 @@
                     <select id="analysis-year-filter" onchange="updateAnalysisUI()" class="text-base font-bold text-blue-400"></select>
                 </div>
             </div>
-
             <div class="grid grid-cols-2 gap-3">
                 <div class="card p-5"><p class="text-[10px] font-bold text-slate-500 uppercase">Spesa Totale</p><p id="stat-total-year" class="text-2xl font-black">€ 0.00</p></div>
-                <div class="card p-5">
-                    <p class="text-[10px] font-bold text-slate-500 uppercase">Media Mese</p>
-                    <p id="stat-avg-month" class="text-2xl font-black">€ 0.00</p>
-                    <p id="stat-avg-info" class="text-[9px] font-bold text-blue-400/80 uppercase mt-1"></p>
-                </div>
+                <div class="card p-5"><p class="text-[10px] font-bold text-slate-500 uppercase">Media Mese</p><p id="stat-avg-month" class="text-2xl font-black">€ 0.00</p><p id="stat-avg-info" class="text-[9px] font-bold text-blue-400/80 uppercase mt-1"></p></div>
             </div>
-            
             <div id="stats-grid" class="grid grid-cols-1 gap-3"></div>
-
             <div class="card p-6 flex flex-col items-center">
                 <p class="text-[10px] font-black text-slate-500 uppercase mb-4 tracking-widest">Incidenza Costi</p>
                 <div class="w-32 h-32"><canvas id="analysisPieChart"></canvas></div>
@@ -164,6 +157,7 @@
             document.getElementById('tab-' + t).classList.add('active-tab');
             document.getElementById('unit-txt').innerText = STYLE[t].unit;
             document.getElementById('note-container').classList.toggle('hidden', t !== 'Altro');
+            document.getElementById('qty-container').classList.toggle('hidden', ['Rifiuti', 'Altro'].includes(t));
             initMonths(); updateUI();
         }
 
@@ -185,17 +179,41 @@
             });
         }
 
-        function initCharts() {
-            mainChart = new Chart(document.getElementById('mainChart').getContext('2d'), {
-                type: 'line',
-                data: { labels: MONTHS, datasets: [
-                    { label: 'Qta', data: Array(12).fill(0), borderColor: '#2563eb', borderWidth: 3, pointRadius: 4, pointBackgroundColor: '#2563eb', yAxisID: 'y' },
-                    { label: '€', data: Array(12).fill(0), borderColor: '#f1f5f9', borderWidth: 1, pointRadius: 3, pointBackgroundColor: '#f1f5f9', yAxisID: 'y1' }
-                ]},
-                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { display: false }, y1: { display: false, position: 'right' }, x: { grid: { display: false }, ticks: { color: '#475569', font: { size: 9 } } } } }
-            });
-            analysisPieChart = new Chart(document.getElementById('analysisPieChart').getContext('2d'), { type: 'doughnut', data: { labels: Object.keys(STYLE), datasets: [{ data: [1,1,1,1,1], backgroundColor: Object.values(STYLE).map(s => s.color), borderWidth: 0 }] }, options: { cutout: '80%', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } } });
+       // 1. SOSTITUISCI COMPLETAMENTE LA FUNZIONE initCharts CON QUESTA
+function initCharts() {
+    mainChart = new Chart(document.getElementById('mainChart').getContext('2d'), {
+        type: 'line',
+        data: { 
+            labels: [], // Vuoto: verrà popolato dinamicamente in updateUI
+            datasets: [
+                { label: 'Qta', data: [], borderColor: '#2563eb', borderWidth: 3, pointRadius: 4, pointBackgroundColor: '#2563eb', yAxisID: 'y', tension: 0.3 },
+                { label: '€', data: [], borderColor: '#f1f5f9', borderWidth: 1, pointRadius: 3, pointBackgroundColor: '#f1f5f9', yAxisID: 'y1', tension: 0.3 }
+            ]
+        },
+        options: { 
+            responsive: true, 
+            maintainAspectRatio: false, 
+            plugins: { legend: { display: false } }, 
+            scales: { 
+                y: { display: false }, 
+                y1: { display: false, position: 'right' }, 
+                x: { grid: { display: false }, ticks: { color: '#475569', font: { size: 9 } } } 
+            } 
         }
+    })
+    
+    analysisPieChart = new Chart(document.getElementById('analysisPieChart').getContext('2d'), { 
+        type: 'doughnut', 
+        data: { 
+            labels: Object.keys(STYLE), 
+            datasets: [{ data: [1,1,1,1,1], backgroundColor: Object.values(STYLE).map(s => s.color), borderWidth: 0 }] 
+        }, 
+        options: { cutout: '80%', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } } 
+    });
+}
+
+
+
 
         function fetchData() {
             updateStatus('Sincro...', 'bg-orange-500 animate-pulse');
@@ -247,29 +265,72 @@
         }
 
         function updateUI() {
-            const y = document.getElementById('in-year').value, qV = Array(12).fill(0), cV = Array(12).fill(0);
-            const filtered = dataStore.filter(d => d.type === currentTab && d.year.toString() === y.toString());
-            filtered.forEach(d => {
-                d.months.split(", ").map(m => m.split(" (")[0].trim()).forEach(m => {
-                    let i = MONTHS.indexOf(m); if(i !== -1) { 
-                        qV[i] += (parseFloat(d.quantity) / d.months.split(", ").length); 
-                        cV[i] += (parseFloat(d.cost) / d.months.split(", ").length); 
-                    }
-                });
-            });
-            mainChart.data.datasets[0].data = qV; mainChart.data.datasets[1].data = cV; mainChart.update();
+    // --- INIZIO PARTE MODIFICATA PER GRAFICO 12 MESI MOBILI ---
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+    
+    let rollingLabels = [];
+    let rollingMonths = []; // Array di oggetti {m: indice, y: anno}
+    
+    // Genera gli ultimi 12 mesi a ritroso da oggi
+    for (let i = 11; i >= 0; i--) {
+        let d = new Date(currentYear, currentMonth - i, 1);
+        rollingLabels.push(MONTHS[d.getMonth()]);
+        rollingMonths.push({ m: d.getMonth(), y: d.getFullYear() });
+    }
+
+    const qV = Array(12).fill(0);
+    const cV = Array(12).fill(0);
+
+    // Filtra i dati solo per tipo (senza filtrare per l'anno della input)
+    dataStore.filter(d => d.type === currentTab).forEach(d => {
+        const monthsInEntry = d.months.split(", ").map(m => m.split(" (")[0].trim());
+        const costPerMonth = parseFloat(d.cost) / monthsInEntry.length;
+        const qtyPerMonth = (parseFloat(d.quantity) || 0) / monthsInEntry.length;
+
+        monthsInEntry.forEach(mName => {
+            const mIdx = MONTHS.indexOf(mName);
+            // Trova se questo mese della bolletta rientra nei 12 mesi visualizzati nel grafico
+            const targetIdx = rollingMonths.findIndex(rm => rm.m === mIdx && rm.y == d.year);
+            if (targetIdx !== -1) {
+                qV[targetIdx] += qtyPerMonth;
+                cV[targetIdx] += costPerMonth;
+            }
+        });
+    });
+
+    // Aggiorna etichette e dati del grafico
+    mainChart.data.labels = rollingLabels;
+    mainChart.data.datasets[0].data = qV; 
+    mainChart.data.datasets[1].data = cV; 
+    // --- MODIFICA PER NASCONDERE LINEA BLU (QTA) ---
+    const isHidden = ['Rifiuti', 'Altro'].includes(currentTab);
+    mainChart.setDatasetVisibility(0, !isHidden); // Nasconde o mostra il dataset 0 (Qta)
+    mainChart.update();
             
-            const energyData = dataStore.filter(d => d.type === currentTab).sort((a,b) => b.id - a.id);
+            // Ordina per anno (discendente) e poi per l'indice del primo mese (discendente)
+const energyData = dataStore.filter(d => d.type === currentTab).sort((a, b) => {
+    if (b.year !== a.year) return b.year - a.year;
+    const monthA = MONTHS.indexOf(a.months.split(", ")[0].split(" (")[0]);
+    const monthB = MONTHS.indexOf(b.months.split(", ")[0].split(" (")[0]);
+    return monthB - monthA;
+});
             const currentYearData = energyData.filter(d => d.year.toString() === new Date().getFullYear().toString());
             
-            // 1. Widget Ultima Bolletta (con durata)
+            // 1. Widget Ultima Bolletta
             if(energyData.length > 0) {
                 const last = energyData[0];
                 const numMesi = last.months.split(", ").length;
                 let durataTesto = numMesi === 1 ? "MENSILE" : (numMesi === 2 ? "BIMESTRALE" : `${numMesi} MESI`);
-                
                 document.getElementById('widget-last-cost').innerText = `€ ${parseFloat(last.cost).toFixed(2)}`;
-                document.getElementById('widget-last-qty').innerHTML = `${last.quantity} ${STYLE[currentTab].unit}<br><span class="text-[8px] text-blue-500 opacity-80">${durataTesto}</span>`;
+                
+                // Nascondi QTA se Rifiuti o Altro
+                if(['Rifiuti', 'Altro'].includes(currentTab)) {
+                    document.getElementById('widget-last-qty').innerHTML = `<span class="text-[8px] text-blue-500 opacity-80">${durataTesto}</span>`;
+                } else {
+                    document.getElementById('widget-last-qty').innerHTML = `${last.quantity} ${STYLE[currentTab].unit}<br><span class="text-[8px] text-blue-500 opacity-80">${durataTesto}</span>`;
+                }
             } else {
                 document.getElementById('widget-last-cost').innerText = "€ 0.00";
                 document.getElementById('widget-last-qty').innerText = "-";
@@ -282,7 +343,12 @@
                 let mSet = new Set(); currentYearData.forEach(d => d.months.split(", ").forEach(m => mSet.add(m.split(" (")[0].trim())));
                 const mCount = mSet.size || 1;
                 document.getElementById('widget-avg-cost').innerText = `€ ${(totC/mCount).toFixed(2)}`;
-                document.getElementById('widget-avg-qty').innerText = `${(totQ/mCount).toFixed(1)} ${STYLE[currentTab].unit}/MESE`;
+                
+                if(['Rifiuti', 'Altro'].includes(currentTab)) {
+                    document.getElementById('widget-avg-qty').innerText = "MEDIA MENSILE";
+                } else {
+                    document.getElementById('widget-avg-qty').innerText = `${(totQ/mCount).toFixed(1)} ${STYLE[currentTab].unit}/MESE`;
+                }
             } else {
                 document.getElementById('widget-avg-cost').innerText = "€ 0.00";
                 document.getElementById('widget-avg-qty').innerText = "NESSUN DATO 2026";
@@ -292,7 +358,9 @@
             energyData.slice(0, 10).forEach(d => {
                 const dv = document.createElement('div'); dv.className = "card p-4 flex justify-between items-center text-xs active:scale-95 transition-all";
                 dv.onclick = () => editEntry(d.id);
-                dv.innerHTML = `<div><b class="text-blue-500">${d.year}</b><br><span class="text-slate-400 uppercase font-bold">${d.months}</span></div><div class="text-right"><b class="text-white">${d.quantity} ${STYLE[d.type].unit}</b><br><span class="text-emerald-500 font-bold">€${parseFloat(d.cost).toFixed(2)}</span></div>`;
+                
+                const qtaHtml = ['Rifiuti', 'Altro'].includes(d.type) ? '' : `<b class="text-white">${d.quantity} ${STYLE[d.type].unit}</b><br>`;
+                dv.innerHTML = `<div><b class="text-blue-500">${d.year}</b><br><span class="text-slate-400 uppercase font-bold">${d.months}</span></div><div class="text-right">${qtaHtml}<span class="text-emerald-500 font-bold">€${parseFloat(d.cost).toFixed(2)}</span></div>`;
                 list.appendChild(dv);
             });
         }
